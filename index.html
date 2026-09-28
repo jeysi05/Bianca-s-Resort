@@ -574,10 +574,10 @@ section{position:relative}
 
 <script>
 var BOOKING_CONFIG = {
-  blockedShifts: [
-    // Examples:
-    // { date: '2026-12-24', shift: 'ALL' },
-    // { date: '2026-12-31', shift: 'ALL' },
+  blockedDates: [
+    // Example — one line per booked date:
+    // '2026-12-24',
+    // '2026-12-31',
   ]
 };
 
@@ -593,8 +593,6 @@ var DAY_LABELS = {
   friday:   'Friday night',
   saturday: 'Saturday night'
 };
-
-var SHIFT_LABELS = { DAY:'Day', NIGHT:'Night', OVERNIGHT:'Overnight', ALL:'Booked' };
 </script>
 
 <nav class="nav on-dark" id="nav">
@@ -1294,20 +1292,13 @@ var SHIFT_LABELS = { DAY:'Day', NIGHT:'Night', OVERNIGHT:'Overnight', ALL:'Booke
   /* ----------------------------------------------------------
      Blocked dates
      ---------------------------------------------------------- */
-  var blocked = (BOOKING_CONFIG.blockedShifts || []).filter(function (b) {
-    return b && b.date && b.date >= todayISO;
+  var blocked = (BOOKING_CONFIG.blockedDates || []).filter(function (d) {
+    return d && d >= todayISO;
   });
 
-  function blockedShiftsForDate(iso) {
-    if (!iso) return [];
-    var out = [];
-    blocked.forEach(function (b) {
-      if (b.date !== iso) return;
-      if (b.shift === 'ALL') {
-        ['DAY','NIGHT','OVERNIGHT'].forEach(function (k) { if (out.indexOf(k) === -1) out.push(k); });
-      } else if (out.indexOf(b.shift) === -1) out.push(b.shift);
-    });
-    return out;
+  function isDateBlocked(iso) {
+    if (!iso) return false;
+    return blocked.indexOf(iso) !== -1;
   }
 
   function formatShort(iso) {
@@ -1321,17 +1312,8 @@ var SHIFT_LABELS = { DAY:'Day', NIGHT:'Night', OVERNIGHT:'Overnight', ALL:'Booke
     var host = document.getElementById('date-hint');
     if (!host) return;
     if (!blocked.length) { host.hidden = true; return; }
-    var byDate = {};
-    blocked.forEach(function (b) {
-      if (!byDate[b.date]) byDate[b.date] = [];
-      if (b.shift === 'ALL') {
-        ['DAY','NIGHT','OVERNIGHT'].forEach(function (k) { if (byDate[b.date].indexOf(k) === -1) byDate[b.date].push(k); });
-      } else if (byDate[b.date].indexOf(b.shift) === -1) byDate[b.date].push(b.shift);
-    });
-    var chips = Object.keys(byDate).sort().map(function (date) {
-      var shifts = byDate[date];
-      var suffix = shifts.length >= 3 ? 'Booked' : shifts.map(function (s) { return SHIFT_LABELS[s] || s; }).join(', ');
-      return '<span class="chip">' + formatShort(date) + ' · ' + suffix + '</span>';
+    var chips = blocked.slice().sort().map(function (d) {
+      return '<span class="chip">' + formatShort(d) + '</span>';
     }).join('');
     host.hidden = false;
     host.innerHTML = '<span class="lbl">Booked</span>' + chips;
@@ -1534,8 +1516,8 @@ var SHIFT_LABELS = { DAY:'Day', NIGHT:'Night', OVERNIGHT:'Overnight', ALL:'Booke
       else if (!isPhMobile(data.phone)) errors.phone = 'That number looks off — try 0928 512 4456 format.';
       if (!data.date) {
         errors.date = 'Pick the date you want.';
-      } else if (blockedShiftsForDate(data.date).length >= 3) {
-        errors.date = 'That date is fully booked. Please pick another.';
+      } else if (isDateBlocked(data.date)) {
+        errors.date = 'That date is already booked. Please pick another.';
       }
       if (!data.rooms) {
         errors.rooms = 'Choose how many rooms.';
@@ -1569,7 +1551,12 @@ var SHIFT_LABELS = { DAY:'Day', NIGHT:'Night', OVERNIGHT:'Overnight', ALL:'Booke
       var key = id.replace('bk-', '');
       if (!el) return;
       el.addEventListener('input', function () { setFieldError(key, ''); });
-      el.addEventListener('change', function () { setFieldError(key, ''); });
+      el.addEventListener('change', function () {
+        setFieldError(key, '');
+        if (key === 'date' && isDateBlocked(el.value)) {
+          setFieldError('date', 'That date is already booked. Please pick another.');
+        }
+      });
     });
   }
 
